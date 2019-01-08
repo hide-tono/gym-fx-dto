@@ -1,6 +1,6 @@
 from random import random
 
-import numpy
+import numpy as np
 import os
 
 from builtins import range, print
@@ -36,10 +36,10 @@ class FxDtoEnv:
             csv = pandas.read_csv(path,
                                   names=['date', 'time', 'open', 'high', 'low', 'close', 'v'],
                                   parse_dates={'datetime': ['date', 'time']},
-                                  dtype={'datetime': numpy.long, 'open': numpy.float32, 'high': numpy.float32, 'low': numpy.float32, 'close': numpy.float32}
+                                  dtype={'datetime': np.long, 'open': np.float32, 'high': np.float32, 'low': np.float32, 'close': np.float32}
                                   )
             csv.index = csv['datetime']
-            csv['datetime'] = csv['datetime'].astype(numpy.long)
+            csv['datetime'] = csv['datetime'].astype(np.long)
             # ohlcを作る際には必要
             # csv = csv.drop('datetime', axis=1)
             # csv = csv.drop('open', axis=1)
@@ -59,21 +59,21 @@ class FxDtoEnv:
         """
         target = self.data.iloc[self.read_index - 60 * env.visible_bar: self.read_index]
         if mode == 'human':
-            m5 = numpy.array(target.resample('5min').agg({'high': 'max',
+            m5 = np.array(target.resample('5min').agg({'high': 'max',
                                                           'low': 'min',
                                                           'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            h1 = numpy.array(target.resample('1H').agg({'high': 'max',
+            h1 = np.array(target.resample('1H').agg({'high': 'max',
                                                         'low': 'min',
                                                         'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            return numpy.array([m5, h1])
+            return np.array([m5, h1])
         elif mode == 'ohlc_array':
-            m5 = numpy.array(target.resample('5min').agg({'high': 'max',
+            m5 = np.array(target.resample('5min').agg({'high': 'max',
                                                           'low': 'min',
                                                           'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            h1 = numpy.array(target.resample('1H').agg({'high': 'max',
+            h1 = np.array(target.resample('1H').agg({'high': 'max',
                                                         'low': 'min',
                                                         'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            return numpy.array([m5, h1])
+            return np.array([m5, h1])
 
 
 period_rsi = 8
@@ -95,7 +95,7 @@ ax = plt.subplot(2, 2, 1)
 ax.get_yaxis().get_major_formatter().set_useOffset(False)
 target_5m = target['close'].resample('5min').ohlc().dropna().iloc[-1 * env.visible_bar:]
 indices_5m = target_5m.index
-dummy_indices_5m = numpy.linspace(0, len(target_5m), len(target_5m))
+dummy_indices_5m = np.linspace(0, len(target_5m), len(target_5m))
 data_5m = pandas.DataFrame({'datetime': dummy_indices_5m,
                         'open': target_5m['open'],
                          'high': target_5m['high'],
@@ -104,7 +104,7 @@ data_5m = pandas.DataFrame({'datetime': dummy_indices_5m,
 mpf.candlestick_ohlc(ax, data_5m, width=width, colorup='g', colordown='r')
 
 # DTOは1つ減るのでtickを合わせるため1始まり
-x_tick = [i for i in numpy.array(indices_5m.to_pydatetime())][1::12]
+x_tick = [i for i in np.array(indices_5m.to_pydatetime())][1::12]
 x_tick_labels_5m = [i.strftime('%H:%M') for i in x_tick]
 ax.set(xticks=dummy_indices_5m[1::12], xticklabels=x_tick_labels_5m)
 
@@ -130,11 +130,11 @@ sk = sto_rsi.rolling(period_sk).mean()
 sd = sk.rolling(period_sd).mean()
 
 dto_indices_5m = sk.index
-dummy_indices_dto_5m = numpy.linspace(0, len(dto_indices_5m), len(dto_indices_5m))
+dummy_indices_dto_5m = np.linspace(0, len(dto_indices_5m), len(dto_indices_5m))
 ax.plot(dummy_indices_dto_5m, sk, label="sk")
 ax.plot(dummy_indices_dto_5m, sd, label="sd")
 
-x_tick = [i for i in numpy.array(dto_indices_5m.to_pydatetime())][::12]
+x_tick = [i for i in np.array(dto_indices_5m.to_pydatetime())][::12]
 x_tick_labels_dto_5m = [i.strftime('%H:%M') for i in x_tick]
 ax.set(xticks=dummy_indices_dto_5m[::12], xticklabels=x_tick_labels_dto_5m)
 
@@ -144,7 +144,7 @@ ax = plt.subplot(2, 2, 2)
 ax.get_yaxis().get_major_formatter().set_useOffset(False)
 target_1h = target['close'].resample('1H').ohlc().dropna().iloc[-1 * env.visible_bar:]
 indices_1h = target_1h.index
-dummy_indices_1h = numpy.linspace(0, len(target_1h), len(target_1h))
+dummy_indices_1h = np.linspace(0, len(target_1h), len(target_1h))
 data_1h = pandas.DataFrame({'datetime': dummy_indices_1h,
                             'open': target_1h['open'],
                             'high': target_1h['high'],
@@ -153,7 +153,7 @@ data_1h = pandas.DataFrame({'datetime': dummy_indices_1h,
 mpf.candlestick_ohlc(ax, data_1h, width=width, colorup='g', colordown='r')
 
 # DTOは1つ減るのでtickを合わせるため1始まり
-x_tick = [i for i in numpy.array(indices_1h.to_pydatetime())][1::12]
+x_tick = [i for i in np.array(indices_1h.to_pydatetime())][1::12]
 x_tick_labels_1h = [i.strftime('%H:%M') for i in x_tick]
 ax.set(xticks=dummy_indices_1h[1::12], xticklabels=x_tick_labels_1h)
 
@@ -179,11 +179,11 @@ sk = sto_rsi.rolling(period_sk).mean()
 sd = sk.rolling(period_sd).mean()
 
 dto_indices_1h = sk.index
-dummy_indices_dto_1h = numpy.linspace(0, len(dto_indices_1h), len(dto_indices_1h))
+dummy_indices_dto_1h = np.linspace(0, len(dto_indices_1h), len(dto_indices_1h))
 ax.plot(dummy_indices_dto_1h, sk, label="sk")
 ax.plot(dummy_indices_dto_1h, sd, label="sd")
 
-x_tick = [i for i in numpy.array(dto_indices_1h.to_pydatetime())][::12]
+x_tick = [i for i in np.array(dto_indices_1h.to_pydatetime())][::12]
 x_tick_labels_dto_1h = [i.strftime('%H:%M') for i in x_tick]
 ax.set(xticks=dummy_indices_dto_1h[::12], xticklabels=x_tick_labels_dto_1h)
 

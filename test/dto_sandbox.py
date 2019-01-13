@@ -83,10 +83,14 @@ period_sd = 3
 
 def show(env):
     # ランダムにデータを抽出
-    env.read_index = int(random() * len(env.data))
-    target = env.data.iloc[env.read_index - 60 * env.visible_bar: env.read_index]
+    env.read_index = 0
+    while not (env.visible_bar < env.read_index < len(env.data) - env.visible_bar):
+        env.read_index = int(random() * len(env.data))
+    # 前後60分足のvisible_bar x2分とる
+    target = env.data.iloc[env.read_index - 60 * env.visible_bar: env.read_index + 60 * env.visible_bar]
 
-    target_5m = target['close'].resample('5min').ohlc().dropna().iloc[-1 * env.visible_bar:]
+    # 先頭からvisible_bar x2分とる
+    target_5m = target['close'].resample('5min').ohlc().dropna().iloc[-2 * env.visible_bar:]
     indices_5m = target_5m.index
     dummy_indices_5m = np.linspace(0, len(target_5m), len(target_5m))
     data_5m = pandas.DataFrame({'datetime': dummy_indices_5m,
@@ -118,7 +122,8 @@ def show(env):
     dummy_indices_dto_5m = np.linspace(0, len(dto_indices_5m), len(dto_indices_5m))
 
     # 1時間足
-    target_1h = target['close'].resample('1H').ohlc().dropna().iloc[-1 * env.visible_bar:]
+    # 先頭からvisible_bar x2分とる
+    target_1h = target['close'].resample('1H').ohlc().dropna().iloc[-2 * env.visible_bar:]
     indices_1h = target_1h.index
     dummy_indices_1h = np.linspace(0, len(target_1h), len(target_1h))
     data_1h = pandas.DataFrame({'datetime': dummy_indices_1h,
@@ -151,8 +156,9 @@ def show(env):
     dummy_indices_dto_1h = np.linspace(0, len(dto_indices_1h), len(dto_indices_1h))
 
     # シグナル計算
-    latest_sk_h1 = sk_1h[len(sk_1h) - 1]
-    latest_sd_h1 = sd_1h[len(sd_1h) - 1]
+    # 真ん中が対象なのでそこを最新と仮定する
+    latest_sk_h1 = sk_1h[env.visible_bar]
+    latest_sd_h1 = sd_1h[env.visible_bar]
     if latest_sk_h1 > latest_sd_h1:
         if latest_sd_h1 > 75:
             print("sd_h1 is over 75! ", latest_sd_h1)
@@ -169,14 +175,21 @@ def show(env):
 
     direction = 0
     cross_index = []
-    for i in reversed(range(2, len(sk_5m) - 1)):
+    # 0 - visivle_barで前半半分
+    for i in reversed(range(0, env.visible_bar)):
         if sk_5m[i] > sd_5m[i] and sk_5m[i - 1] < sd_5m[i - 1]:
             cross_index.append(i)
             if direction == 0:
+                if latest_sk_h1 < latest_sd_h1 or latest_sd_h1 > 80:
+                    print("DTO 1h=s, 5m=b")
+                    return False
                 direction = 1
         elif sk_5m[i] < sd_5m[i] and sk_5m[i - 1] > sd_5m[i - 1]:
             cross_index.append(i)
             if direction == 0:
+                if latest_sk_h1 > latest_sd_h1 or latest_sd_h1 < 20:
+                    print("DTO 1h=b, 5m=s")
+                    return False
                 direction = -1
         if len(cross_index) >= 4:
             break
@@ -205,6 +218,7 @@ def show(env):
         if not inner < c < a < b < start:
             print("not ABC pattern!")
             return False
+        print("--- ABC Buy pattern --- on ", indices_5m[env.visible_bar])
     else:
         c = data_5m['high'][cross_index[0]]
         b = data_5m['low'][cross_index[1]]
@@ -214,8 +228,10 @@ def show(env):
         if not inner > c > a > b > start:
             print("not ABC pattern!")
             return False
+        print("--- ABC Sell pattern --- on ", indices_5m[env.visible_bar])
 
     # 表示
+    x_tick_distance = 24
     fig = plt.figure(figsize=(10, 4))
     # ローソク足は全横幅の太さが1である。表示する足数で割ってさらにその1/3の太さにする
     width = 1.0 / env.visible_bar / 3
@@ -225,15 +241,16 @@ def show(env):
     ax.get_yaxis().get_major_formatter().set_useOffset(False)
     mpf.candlestick_ohlc(ax, data_5m.values, width=width, colorup='g', colordown='r')
     # DTOは1つ減るのでtickを合わせるため1始まり
-    x_tick = [i for i in np.array(indices_5m.to_pydatetime())][1::12]
+    x_tick = [i for i in np.array(indices_5m.to_pydatetime())][1::x_tick_distance]
     x_tick_labels_5m = [i.strftime('%H:%M') for i in x_tick]
+    ax.set(xticks=dummy_indices_5m[1::x_tick_distance], xticklabels=x_tick_labels_5m)
+
     ax = plt.subplot(2, 2, 3)
-    ax.set(xticks=dummy_indices_5m[1::12], xticklabels=x_tick_labels_5m)
     ax.plot(dummy_indices_dto_5m, sk_5m, label="sk")
     ax.plot(dummy_indices_dto_5m, sd_5m, label="sd")
-    x_tick = [i for i in np.array(dto_indices_5m.to_pydatetime())][::12]
+    x_tick = [i for i in np.array(dto_indices_5m.to_pydatetime())][::x_tick_distance]
     x_tick_labels_dto_5m = [i.strftime('%H:%M') for i in x_tick]
-    ax.set(xticks=dummy_indices_dto_5m[::12], xticklabels=x_tick_labels_dto_5m)
+    ax.set(xticks=dummy_indices_dto_5m[::x_tick_distance], xticklabels=x_tick_labels_dto_5m)
 
     # 1時間足
     ax = plt.subplot(2, 2, 2)
@@ -241,15 +258,15 @@ def show(env):
     ax.get_yaxis().get_major_formatter().set_useOffset(False)
     mpf.candlestick_ohlc(ax, data_1h.values, width=width, colorup='g', colordown='r')
     # DTOは1つ減るのでtickを合わせるため1始まり
-    x_tick = [i for i in np.array(indices_1h.to_pydatetime())][1::12]
-    x_tick_labels_1h = [i.strftime('%H:%M') for i in x_tick]
-    ax.set(xticks=dummy_indices_1h[1::12], xticklabels=x_tick_labels_1h)
+    x_tick = [i for i in np.array(indices_1h.to_pydatetime())][1::x_tick_distance]
+    x_tick_labels_1h = [i.strftime('%d %H') for i in x_tick]
+    ax.set(xticks=dummy_indices_1h[1::x_tick_distance], xticklabels=x_tick_labels_1h)
     ax = plt.subplot(2, 2, 4)
     ax.plot(dummy_indices_dto_1h, sk_1h, label="sk")
     ax.plot(dummy_indices_dto_1h, sd_1h, label="sd")
-    x_tick = [i for i in np.array(dto_indices_1h.to_pydatetime())][::12]
-    x_tick_labels_dto_1h = [i.strftime('%H:%M') for i in x_tick]
-    ax.set(xticks=dummy_indices_dto_1h[::12], xticklabels=x_tick_labels_dto_1h)
+    x_tick = [i for i in np.array(dto_indices_1h.to_pydatetime())][::x_tick_distance]
+    x_tick_labels_dto_1h = [i.strftime('%d %H') for i in x_tick]
+    ax.set(xticks=dummy_indices_dto_1h[::x_tick_distance], xticklabels=x_tick_labels_dto_1h)
     plt.show()
     return True
 

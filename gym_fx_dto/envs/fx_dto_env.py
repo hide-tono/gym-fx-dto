@@ -58,6 +58,12 @@ class FxDtoEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=self.MAX_VALUE, shape=numpy.shape(self.make_obs('ohlc_array')))
         self.m5 = []
         self.h1 = []
+        # DTO設定
+        self.period_rsi = 8
+        self.period_stoch = 5
+        self.period_sk = 3
+        self.period_sd = 3
+
 
     def reset(self):
         self.info = AccountInformation(self.initial_balance)
@@ -144,10 +150,31 @@ class FxDtoEnv(gym.Env):
 
     def make_obs(self, mode):
         """
-        5分足、1時間足の2時系列データを64本分作成する
+        5分足1日分のデータを作成し、ABCパターンに該当するものがあればそこから64本分を返す
         :return:
         """
-        target = self.data.iloc[self.read_index - 60 * 64: self.read_index]
+        target = self.data.iloc[self.read_index - 1440: self.read_index]
+        # 先頭からvisible_bar x2分とる
+        target_5m = target['close'].resample('5min').ohlc().dropna()
+        # DTO(8,5,3,3)
+        # RSI計算(8)
+        close = target_5m['close']
+        diff = close.diff()[1:]
+        up, down = diff.copy(), diff.copy()
+        up[up < 0] = 0
+        down[down > 0] = 0
+        up_sma = up.rolling(window=8, center=False).mean()
+        down_sma = down.abs().rolling(window=8, center=False).mean()
+        rs = up_sma / down_sma
+        rsi = 100.0 - (100.0 / (1.0 + rs))
+        # DTOの計算
+        rolling = rsi.rolling(self.period_stoch)
+        llv = rolling.min()
+        hhv = rolling.max()
+        sto_rsi = 100 * ((rsi - llv) / (hhv - llv))
+        sk_5m = sto_rsi.rolling(self.period_sk).mean()
+        sd_5m = sk_5m.rolling(self.period_sd).mean()
+
         if mode == 'human':
             m5 = numpy.array(target.resample('5min').agg({'high': 'max',
                                                           'low': 'min',

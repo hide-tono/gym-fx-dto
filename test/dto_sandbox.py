@@ -49,31 +49,6 @@ class FxDtoEnv:
             # 最後に読んだCSVのインデックスを開始インデックスとする
             self.read_index = len(self.data) - len(csv)
 
-        self.tickets = []
-
-    def make_obs(self, mode):
-        """
-        5分足、1時間足の2時系列データをvisible_bar本分作成する
-        :return:
-        """
-        target = self.data.iloc[self.read_index - 60 * env.visible_bar: self.read_index]
-        if mode == 'human':
-            m5 = np.array(target.resample('5min').agg({'high': 'max',
-                                                       'low': 'min',
-                                                       'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            h1 = np.array(target.resample('1H').agg({'high': 'max',
-                                                     'low': 'min',
-                                                     'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            return np.array([m5, h1])
-        elif mode == 'ohlc_array':
-            m5 = np.array(target.resample('5min').agg({'high': 'max',
-                                                       'low': 'min',
-                                                       'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            h1 = np.array(target.resample('1H').agg({'high': 'max',
-                                                     'low': 'min',
-                                                     'close': 'last'}).dropna().iloc[-1 * self.visible_bar:][target.columns])
-            return np.array([m5, h1])
-
 
 period_rsi = 8
 period_stoch = 5

@@ -70,6 +70,7 @@ sto_rsi = 100 * ((rsi - llv) / (hhv - llv))
 sk_5m = sto_rsi.rolling(period_sk).mean()
 sd_5m = sk_5m.rolling(period_sd).mean()
 
+signal_index = []
 cross_index = []
 for i in range(1, len(target_5m) - 1):
     if sk_5m[i] > sd_5m[i] and sk_5m[i - 1] < sd_5m[i - 1]:
@@ -78,7 +79,7 @@ for i in range(1, len(target_5m) - 1):
     elif sk_5m[i] < sd_5m[i] and sk_5m[i - 1] > sd_5m[i - 1]:
         cross_index.append(i)
         direction = -1
-    if len(cross_index) >= 4 and (cross_index[-1] - (cross_index[-4]) * 2 >= 0): # TODO
+    if len(cross_index) >= 4 and (cross_index[-1] - (cross_index[-1] - cross_index[-4]) * 2 >= 0):  # TODO
         if direction > 0:
             c = target_5m['low'][cross_index[-1]]
             b = target_5m['high'][cross_index[-2]]
@@ -86,13 +87,21 @@ for i in range(1, len(target_5m) - 1):
             start = target_5m['high'][cross_index[-4]]
             if c < a < b < start:
                 # innerの計算ABCパターン先頭からABCパターンの2倍分
-                rolling = target_5m[cross_index[-1] - (cross_index[-4]) * 2:cross_index[-4]]['close'].rolling((cross_index[-1] - cross_index[-4]) * 2)
-                inner = rolling.min()[cross_index[-4]]
+                rolling = target_5m[cross_index[-1] - (cross_index[-1] - cross_index[-4]) * 2:cross_index[-4]]['close'].rolling((cross_index[-1] - cross_index[-4]) * 2)
+                inner = rolling.min().dropna() # TODO
                 if inner < c:
                     print(inner, c, a, b, start)
                     print("--- ABC Buy pattern --- on ", target_5m[i].index)
-                    # TODO index append
-                    # TODO 利益計算
+                    open = target_5m['open'][i]
+                    # innerをストップロスとし、それの3倍で利確する
+                    takeProfit = open + (open - inner) * 3
+                    for j in range(i, len(target_5m) - 1):
+                        if target_5m['low'][i] < inner:
+                            signal_index.append([target_5m[i].index, -1])
+                            break
+                        elif target_5m['high'][i] > takeProfit:
+                            signal_index.append([target_5m[i].index, 1])
+                            break
         else:
             c = target_5m['high'][cross_index[-1]]
             b = target_5m['low'][cross_index[-2]]
@@ -101,8 +110,19 @@ for i in range(1, len(target_5m) - 1):
             print(inner, c, a, b, start)
             if not c > a > b > start:
                 # innerの計算ABCパターン先頭からABCパターンの2倍分
-                rolling = target_5m[cross_index[-1] -  - cross_index[-4]:cross_index[-4]]['close'].rolling((cross_index[-1] - cross_index[-4]) * 2)
-                inner = rolling.max()[cross_index[-4]]
+                rolling = target_5m[cross_index[-1] - (cross_index[-1] - cross_index[-4]) * 2:cross_index[-4]]['close'].rolling((cross_index[-1] - cross_index[-4]) * 2)
+                inner = rolling.max().dropna()
                 if inner > c:
                     print(inner, c, a, b, start)
                     print("--- ABC Sell pattern --- on ", target_5m[i].index)
+                    open = target_5m['open'][i]
+                    # innerをストップロスとし、それの3倍で利確する
+                    takeProfit = open - (inner - open) * 3
+                    for j in range(i, len(target_5m) - 1):
+                        if target_5m['high'][i] > inner:
+                            signal_index.append([target_5m[i].index, -1])
+                            break
+                        elif target_5m['low'][i] < takeProfit:
+                            signal_index.append([target_5m[i].index, 1])
+                            break
+print(signal_index)

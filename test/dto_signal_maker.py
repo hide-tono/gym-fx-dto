@@ -77,13 +77,14 @@ lose_buy = 0
 win_sell = 0
 lose_sell = 0
 for i in range(1, len(target_5m) - 1):
+    direction = 0
     if sk_5m[i] > sd_5m[i] and sk_5m[i - 1] < sd_5m[i - 1]:
         cross_index.append(i)
         direction = 1
     elif sk_5m[i] < sd_5m[i] and sk_5m[i - 1] > sd_5m[i - 1]:
         cross_index.append(i)
         direction = -1
-    if len(cross_index) >= 4:  # TODO
+    if len(cross_index) >= 4:
         if direction > 0:
             c = target_5m['low'][cross_index[-1]]
             b = target_5m['high'][cross_index[-2]]
@@ -91,56 +92,57 @@ for i in range(1, len(target_5m) - 1):
             start = target_5m['high'][cross_index[-4]]
             if c < a < b < start:
                 # innerの計算ABCパターン先頭からABCパターンの2倍分
-                inner_min = target_5m['close'].rolling((cross_index[-1] - cross_index[-4]) * 2).min().dropna()
+                inner_min = target_5m['close'][:cross_index[-1]].rolling((cross_index[-1] - cross_index[-4]) * 2).min().dropna()
                 if len(inner_min) < 1:
                     # 十分なデータがない
                     continue
                 inner = inner_min[len(inner_min) - 1]
                 if inner < c:
                     print(inner, c, a, b, start)
-                    open = target_5m['open'][i]
+                    open_5m = target_5m['open'][i]
                     # innerをストップロスとし、それの3倍で利確する
-                    takeProfit = open + (open - inner) * 3
+                    takeProfit = open_5m + (open_5m - inner) * 3
                     for j in range(i, len(target_5m) - 1):
-                        if target_5m['low'][i] < inner:
-                            signal_index.append([target_5m[i].index, -1])
+                        if target_5m['low'][j] < inner:
+                            signal_index.append([target_5m.index[i], -1])
                             print("--- ABC Buy pattern lose --- on ", target_5m.index[i])
                             lose_buy += 1
                             break
-                        elif target_5m['high'][i] > takeProfit:
-                            signal_index.append([target_5m[i].index, 1])
+                        elif target_5m['high'][j] > takeProfit:
+                            signal_index.append([target_5m.index[i], 1])
                             print("--- ABC Buy pattern win --- on ", target_5m.index[i])
                             win_buy += 1
                             break
-                    print("NOT MOVE on Buy!! ", target_5m.index[i])
-        else:
+        elif direction < 0:
             c = target_5m['high'][cross_index[-1]]
             b = target_5m['low'][cross_index[-2]]
             a = target_5m['high'][cross_index[-3]]
             start = target_5m['low'][cross_index[-4]]
             if not c > a > b > start:
                 # innerの計算ABCパターン先頭からABCパターンの2倍分
-                inner_max = target_5m['close'].rolling((cross_index[-1] - cross_index[-4]) * 2).max().dropna()
+                inner_max = target_5m['close'][:cross_index[-1]].rolling((cross_index[-1] - cross_index[-4]) * 2).max().dropna()
                 if len(inner_max) < 1:
                     # 十分なデータがない
                     continue
                 inner = inner_max[len(inner_max) - 1]
                 if inner > c:
                     print(inner, c, a, b, start)
-                    open = target_5m['open'][i]
+                    open_5m = target_5m['open'][i]
                     # innerをストップロスとし、それの3倍で利確する
-                    takeProfit = open - (inner - open) * 3
+                    takeProfit = open_5m - (inner - open_5m) * 3
                     for j in range(i, len(target_5m) - 1):
-                        if target_5m['high'][i] > inner:
-                            signal_index.append([target_5m[i].index, -1])
+                        if target_5m['high'][j] > inner:
+                            signal_index.append([target_5m.index[i], -1])
                             print("--- ABC Sell pattern lose --- on ", target_5m.index[i])
                             lose_sell += 1
                             break
-                        elif target_5m['low'][i] < takeProfit:
-                            signal_index.append([target_5m[i].index, 1])
+                        elif target_5m['low'][j] < takeProfit:
+                            signal_index.append([target_5m.index[i], 1])
                             print("--- ABC Sell pattern win --- on ", target_5m.index[i])
-                            lose_buy += 1
+                            win_sell += 1
                             break
-                    print("NOT MOVE on Sell!! ", target_5m.index[i])
-print(win_buy, " ", win_sell, " ", lose_buy, " ", lose_sell)
+print("win_buy:", win_buy, " win_sell:", win_sell, " lose_buy:", lose_buy, " lose_sell:", lose_sell)
+print("win_rate:", (1.0 * (win_buy + win_sell)) / (win_buy + win_sell + lose_buy + lose_sell))
+print("win_buy_rate:", (1.0 * win_buy) / (win_buy + lose_buy))
+print("win_sell_rate:", (1.0 * win_sell) / (win_sell + lose_sell))
 print(signal_index)
